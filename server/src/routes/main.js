@@ -26,8 +26,16 @@ router.post("/couriers", authMiddleware, hasRole('admin', 'dispatcher'), courier
 router.put("/couriers/:id", authMiddleware, hasRole('admin', 'dispatcher'), courierController.update);
 router.delete("/couriers/:id", authMiddleware, hasRole('admin', 'dispatcher'), courierController.remove);
 
+// Orders management
+router.get("/orders", authMiddleware, orderController.list);
+router.get("/orders/stats", authMiddleware, orderController.stats);
+router.get("/orders/:id", authMiddleware, orderController.getById);
+router.post("/orders", authMiddleware, hasRole('admin', 'dispatcher'), orderController.create);
+router.put("/orders/:id", authMiddleware, hasRole('admin', 'dispatcher'), orderController.update);
+router.post("/orders/:id/assign", authMiddleware, hasRole('admin', 'dispatcher'), orderController.assign);
+router.post("/orders/:id/status", authMiddleware, orderController.status);
+
 // Namespace handshakes for other domains
-router.get("/orders", orderController.handshake);
 router.get("/users", userController.handshake);
 
 module.exports = router;

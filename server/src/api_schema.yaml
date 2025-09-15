@@ -1,8 +1,10 @@
 openapi: 3.0.0
 info:
   title: Courier Management API
-  version: 1.0.0
-  description: CRUD for couriers with filters, pagination and relation to users.
+  version: 1.1.0
+  description: |
+    CRUD for couriers with filters, pagination and relation to users.
+    Orders management: creation, assignment, status transitions and stats.
 servers:
   - url: /api
     description: Base API path
@@ -80,6 +82,62 @@ components:
         limit:
           type: integer
           example: 20
+    Order:
+      type: object
+      properties:
+        _id:
+          type: string
+          example: "6790c6aa2d9a11e5b8e1aa11"
+        number:
+          type: string
+          example: "ORD-2025-000123"
+        customerName:
+          type: string
+          example: "Alice Johnson"
+        customerPhone:
+          type: string
+          example: "+15550001234"
+        addressFrom:
+          type: string
+          example: "1 Market St, San Francisco, CA"
+        addressTo:
+          type: string
+          example: "1600 Amphitheatre Pkwy, Mountain View, CA"
+        price:
+          type: number
+          example: 25.5
+        status:
+          type: string
+          enum: [new, assigned, picked_up, delivered, canceled]
+          example: assigned
+        courier:
+          oneOf:
+            - $ref: '#/components/schemas/Courier'
+            - type: 'null'
+        createdBy:
+          $ref: '#/components/schemas/UserShort'
+        notes:
+          type: string
+          example: "Leave at the reception"
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    OrderListResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Order'
+        total:
+          type: integer
+        page:
+          type: integer
+        limit:
+          type: integer
     Error:
       type: object
       properties:
@@ -365,6 +423,435 @@ paths:
                 $ref: '#/components/schemas/Error'
         '404':
           description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /orders:
+    get:
+      summary: List orders with filters, pagination and sorting
+      description: |
+        - Filters: status, courierId, q (search in number or customerName), createdFrom, createdTo.
+        - Pagination: page (1-based), limit (1..100).
+        - Sorting: sortBy [createdAt, price, status, number, customerName], sortDir [asc, desc].
+        - Couriers role: only own orders are returned.
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: status
+          schema:
+            type: string
+            enum: [new, assigned, picked_up, delivered, canceled]
+        - in: query
+          name: courierId
+          schema:
+            type: string
+          description: Filter by courier id (admin|dispatcher only; couriers are restricted to own automatically)
+        - in: query
+          name: q
+          schema:
+            type: string
+          description: Search by order number or customerName (case-insensitive)
+        - in: query
+          name: createdFrom
+          schema:
+            type: string
+            format: date-time
+        - in: query
+          name: createdTo
+          schema:
+            type: string
+            format: date-time
+        - in: query
+          name: page
+          schema:
+            type: integer
+            default: 1
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 20
+        - in: query
+          name: sortBy
+          schema:
+            type: string
+            enum: [createdAt, price, status, number, customerName]
+            default: createdAt
+        - in: query
+          name: sortDir
+          schema:
+            type: string
+            enum: [asc, desc]
+            default: desc
+      responses:
+        '200':
+          description: List of orders
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderListResponse'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    post:
+      summary: Create an order
+      description: Only roles admin|dispatcher are allowed. If courierId provided, order status becomes 'assigned', otherwise 'new'.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [number, customerName, customerPhone, addressFrom, addressTo, price]
+              properties:
+                number:
+                  type: string
+                customerName:
+                  type: string
+                customerPhone:
+                  type: string
+                addressFrom:
+                  type: string
+                addressTo:
+                  type: string
+                price:
+                  type: number
+                notes:
+                  type: string
+                courierId:
+                  type: string
+      responses:
+        '201':
+          description: Created order
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Courier not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Duplicate order number
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /orders/{id}:
+    get:
+      summary: Get order by id
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Order details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+        '400':
+          description: Invalid id
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Forbidden for courier (not own order)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Order not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    put:
+      summary: Update order card (no status/courier change here)
+      description: Only roles admin|dispatcher are allowed.
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                number:
+                  type: string
+                customerName:
+                  type: string
+                customerPhone:
+                  type: string
+                addressFrom:
+                  type: string
+                addressTo:
+                  type: string
+                price:
+                  type: number
+                notes:
+                  type: string
+      responses:
+        '200':
+          description: Updated order
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Order not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Duplicate order number
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /orders/{id}/assign:
+    post:
+      summary: Assign or reassign a courier to the order
+      description: Only roles admin|dispatcher are allowed. If order was 'new', becomes 'assigned'. Send courierId=null to unassign.
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                courierId:
+                  oneOf:
+                    - type: string
+                    - type: 'null'
+      responses:
+        '200':
+          description: Order with updated courier assignment
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+        '400':
+          description: Invalid id or courierId
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Order or courier not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /orders/{id}/status:
+    post:
+      summary: Change order status with transition validation
+      description: |
+        Allowed transitions: new -> assigned -> picked_up -> delivered. canceled is allowed from new or assigned.
+        Roles: admin|dispatcher can perform any valid transition. Couriers can change only own orders and only assigned->picked_up and picked_up->delivered.
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status:
+                  type: string
+                  enum: [new, assigned, picked_up, delivered, canceled]
+      responses:
+        '200':
+          description: Order with updated status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+        '400':
+          description: Invalid transition or input
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Forbidden (courier not owner or role not allowed)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Order not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /orders/stats:
+    get:
+      summary: Orders statistics (by status, by courier, totals)
+      description: |
+        Returns aggregated metrics for orders. Optional date range filter (createdFrom/createdTo). For couriers role, stats are scoped to their own orders.
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: createdFrom
+          schema:
+            type: string
+            format: date-time
+        - in: query
+          name: createdTo
+          schema:
+            type: string
+            format: date-time
+        - in: query
+          name: courierId
+          schema:
+            type: string
+          description: Filter by courier id (admin|dispatcher only)
+      responses:
+        '200':
+          description: Aggregated stats
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  range:
+                    type: object
+                    properties:
+                      from:
+                        type: string
+                        nullable: true
+                      to:
+                        type: string
+                        nullable: true
+                  total:
+                    type: integer
+                  byStatus:
+                    type: object
+                    properties:
+                      new: { type: integer }
+                      assigned: { type: integer }
+                      picked_up: { type: integer }
+                      delivered: { type: integer }
+                      canceled: { type: integer }
+                  byStatusPrice:
+                    type: object
+                    properties:
+                      new: { type: number }
+                      assigned: { type: number }
+                      picked_up: { type: number }
+                      delivered: { type: number }
+                      canceled: { type: number }
+                  byCourier:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        courierId:
+                          type: string
+                          nullable: true
+                        courierName:
+                          type: string
+                          nullable: true
+                        count:
+                          type: integer
+        '400':
+          description: Bad request
           content:
             application/json:
               schema:
