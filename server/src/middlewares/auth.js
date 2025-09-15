@@ -1,18 +1,34 @@
+"use strict";
 const jwt = require("jsonwebtoken");
+const { JWT_SECRET, NODE_ENV } = require("@src/config/constants");
 
-// In this iteration we keep a simple dev secret; later move to a config constant if needed.
-const JWT_SECRET = "dev-secret";
-
-exports.verifyAuth = (req, res, next) => {
+module.exports = function auth(req, res, next) {
   try {
-    const header = req.headers.authorization || "";
-    const token = header.startsWith("Bearer ") ? header.slice(7) : null;
-    if (!token) return res.status(401).json({ error: "Authorization token is required" });
+    const authHeader = req.headers["authorization"] || req.headers["Authorization"]; 
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      return res.status(401).json({
+        message: "Authorization header is missing or invalid",
+        code: "AUTH_HEADER_MISSING",
+      });
+    }
 
-    const payload = jwt.verify(token, JWT_SECRET);
-    req.user = { id: payload.id || payload.sub || null, role: payload.role || null };
-    return next();
-  } catch (error) {
-    return res.status(401).json({ error: error.message });
+    const token = authHeader.split(" ")[1];
+    try {
+      const payload = jwt.verify(token, JWT_SECRET);
+      req.user = { id: payload.userId, role: payload.role };
+      return next();
+    } catch (err) {
+      return res.status(401).json({
+        message: err.message || "Invalid or expired token",
+        code: "TOKEN_INVALID",
+        stack: NODE_ENV === "development" ? err.stack : undefined,
+      });
+    }
+  } catch (err) {
+    return res.status(500).json({
+      message: err.message || "Auth middleware error",
+      code: "AUTH_MIDDLEWARE_ERROR",
+      stack: NODE_ENV === "development" ? err.stack : undefined,
+    });
   }
 };

@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: Courier Management API
-  version: 0.1.0
+  version: 0.2.0
   description: |
     HTTP-only (no sockets) API for a courier management system.
     All endpoints are prefixed with /api on the server.
@@ -33,6 +33,223 @@ paths:
               example:
                 scope: auth
                 message: Auth API is reachable
+  /auth/register:
+    post:
+      summary: Register a new user and optional courier profile
+      description: |
+        Creates a new user. If role is `courier`, also creates a linked courier profile.
+        Returns a JWT token in the response body. Token must be placed in the `Authorization: Bearer <token>` header on the client.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+                role:
+                  type: string
+                  enum: [admin, dispatcher, courier]
+                  default: dispatcher
+                fullName:
+                  type: string
+                phone:
+                  type: string
+                courier:
+                  type: object
+                  properties:
+                    vehicleType:
+                      type: string
+                      enum: [foot, bike, car, scooter]
+                    city:
+                      type: string
+                    rating:
+                      type: number
+                      minimum: 0
+                      maximum: 5
+                    isAvailable:
+                      type: boolean
+                    currentLocation:
+                      type: object
+                      properties:
+                        lat:
+                          type: number
+                        lng:
+                          type: number
+              required: [email, password]
+            example:
+              email: john.doe@example.com
+              password: secret123
+              role: courier
+              fullName: John Doe
+              phone: "+1-555-1234"
+              courier:
+                vehicleType: bike
+                city: New York
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              example:
+                user:
+                  _id: 66f0c0a0a0a0a0a0a0a0a0a0
+                  email: john.doe@example.com
+                  role: courier
+                  fullName: John Doe
+                  phone: "+1-555-1234"
+                  isActive: true
+                  createdAt: 2024-01-01T00:00:00.000Z
+                  updatedAt: 2024-01-01T00:00:00.000Z
+                courier:
+                  _id: 66f0c0b1b1b1b1b1b1b1b1b1
+                  user: 66f0c0a0a0a0a0a0a0a0a0a0
+                  vehicleType: bike
+                  city: New York
+                  rating: 0
+                  isAvailable: true
+                  currentLocation:
+                    lat: null
+                    lng: null
+                  createdAt: 2024-01-01T00:00:00.000Z
+                  updatedAt: 2024-01-01T00:00:00.000Z
+                token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              example:
+                message: Email and password are required
+                code: VALIDATION_ERROR
+        '409':
+          description: Conflict (duplicate email)
+          content:
+            application/json:
+              example:
+                message: User with this email already exists
+                code: EMAIL_TAKEN
+        '500':
+          description: Server error
+          content:
+            application/json:
+              example:
+                message: Registration error
+                code: AUTH_REGISTER_ERROR
+  /auth/login:
+    post:
+      summary: Login by email and password
+      description: Returns JWT token and user profile upon successful authentication.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+              required: [email, password]
+            example:
+              email: john.doe@example.com
+              password: secret123
+      responses:
+        '200':
+          description: Authenticated
+          content:
+            application/json:
+              example:
+                user:
+                  _id: 66f0c0a0a0a0a0a0a0a0a0a0
+                  email: john.doe@example.com
+                  role: courier
+                  fullName: John Doe
+                  phone: "+1-555-1234"
+                  isActive: true
+                  createdAt: 2024-01-01T00:00:00.000Z
+                  updatedAt: 2024-01-01T00:00:00.000Z
+                token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              example:
+                message: Email and password are required
+                code: VALIDATION_ERROR
+        '401':
+          description: Invalid credentials
+          content:
+            application/json:
+              example:
+                message: Invalid email or password
+                code: INVALID_CREDENTIALS
+        '500':
+          description: Server error
+          content:
+            application/json:
+              example:
+                message: Login error
+                code: AUTH_LOGIN_ERROR
+  /auth/me:
+    get:
+      summary: Get current user profile
+      security:
+        - bearerAuth: []
+      description: Returns the current authenticated user (and courier profile if role is courier).
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              example:
+                user:
+                  _id: 66f0c0a0a0a0a0a0a0a0a0a0
+                  email: john.doe@example.com
+                  role: courier
+                  fullName: John Doe
+                  phone: "+1-555-1234"
+                  isActive: true
+                  createdAt: 2024-01-01T00:00:00.000Z
+                  updatedAt: 2024-01-01T00:00:00.000Z
+                courier:
+                  _id: 66f0c0b1b1b1b1b1b1b1b1b1
+                  user: 66f0c0a0a0a0a0a0a0a0a0a0
+                  vehicleType: bike
+                  city: New York
+                  rating: 0
+                  isAvailable: true
+                  currentLocation:
+                    lat: null
+                    lng: null
+                  createdAt: 2024-01-01T00:00:00.000Z
+                  updatedAt: 2024-01-01T00:00:00.000Z
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              example:
+                message: Authorization header is missing or invalid
+                code: AUTH_HEADER_MISSING
+        '404':
+          description: User not found
+          content:
+            application/json:
+              example:
+                message: User not found
+                code: USER_NOT_FOUND
+        '500':
+          description: Server error
+          content:
+            application/json:
+              example:
+                message: Profile error
+                code: AUTH_ME_ERROR
   /couriers:
     get:
       summary: Couriers namespace handshake
@@ -75,3 +292,51 @@ components:
       type: http
       scheme: bearer
       bearerFormat: JWT
+  schemas:
+    User:
+      type: object
+      properties:
+        _id:
+          type: string
+        email:
+          type: string
+        role:
+          type: string
+          enum: [admin, dispatcher, courier]
+        fullName:
+          type: string
+        phone:
+          type: string
+        isActive:
+          type: boolean
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+    Courier:
+      type: object
+      properties:
+        _id:
+          type: string
+        user:
+          type: string
+        vehicleType:
+          type: string
+          enum: [foot, bike, car, scooter]
+        city:
+          type: string
+        rating:
+          type: number
+        isAvailable:
+          type: boolean
+        currentLocation:
+          type: object
+          properties:
+            lat:
+              type: number
+            lng:
+              type: number
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
