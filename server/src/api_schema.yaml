@@ -1,291 +1,11 @@
-openapi: 3.0.3
+openapi: 3.0.0
 info:
   title: Courier Management API
-  version: 0.2.0
-  description: |
-    HTTP-only (no sockets) API for a courier management system.
-    All endpoints are prefixed with /api on the server.
+  version: 1.0.0
+  description: CRUD for couriers with filters, pagination and relation to users.
 servers:
   - url: /api
-paths:
-  /status:
-    get:
-      summary: Service status
-      description: Returns basic service health information.
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              example:
-                status: ok
-                timestamp: 2024-01-01T00:00:00.000Z
-                service: Courier Management API
-  /auth:
-    get:
-      summary: Auth namespace handshake
-      description: Placeholder route to verify auth namespace is reachable.
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              example:
-                scope: auth
-                message: Auth API is reachable
-  /auth/register:
-    post:
-      summary: Register a new user and optional courier profile
-      description: |
-        Creates a new user. If role is `courier`, also creates a linked courier profile.
-        Returns a JWT token in the response body. Token must be placed in the `Authorization: Bearer <token>` header on the client.
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                email:
-                  type: string
-                  format: email
-                password:
-                  type: string
-                role:
-                  type: string
-                  enum: [admin, dispatcher, courier]
-                  default: dispatcher
-                fullName:
-                  type: string
-                phone:
-                  type: string
-                courier:
-                  type: object
-                  properties:
-                    vehicleType:
-                      type: string
-                      enum: [foot, bike, car, scooter]
-                    city:
-                      type: string
-                    rating:
-                      type: number
-                      minimum: 0
-                      maximum: 5
-                    isAvailable:
-                      type: boolean
-                    currentLocation:
-                      type: object
-                      properties:
-                        lat:
-                          type: number
-                        lng:
-                          type: number
-              required: [email, password]
-            example:
-              email: john.doe@example.com
-              password: secret123
-              role: courier
-              fullName: John Doe
-              phone: "+1-555-1234"
-              courier:
-                vehicleType: bike
-                city: New York
-      responses:
-        '201':
-          description: Created
-          content:
-            application/json:
-              example:
-                user:
-                  _id: 66f0c0a0a0a0a0a0a0a0a0a0
-                  email: john.doe@example.com
-                  role: courier
-                  fullName: John Doe
-                  phone: "+1-555-1234"
-                  isActive: true
-                  createdAt: 2024-01-01T00:00:00.000Z
-                  updatedAt: 2024-01-01T00:00:00.000Z
-                courier:
-                  _id: 66f0c0b1b1b1b1b1b1b1b1b1
-                  user: 66f0c0a0a0a0a0a0a0a0a0a0
-                  vehicleType: bike
-                  city: New York
-                  rating: 0
-                  isAvailable: true
-                  currentLocation:
-                    lat: null
-                    lng: null
-                  createdAt: 2024-01-01T00:00:00.000Z
-                  updatedAt: 2024-01-01T00:00:00.000Z
-                token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
-        '400':
-          description: Validation error
-          content:
-            application/json:
-              example:
-                message: Email and password are required
-                code: VALIDATION_ERROR
-        '409':
-          description: Conflict (duplicate email)
-          content:
-            application/json:
-              example:
-                message: User with this email already exists
-                code: EMAIL_TAKEN
-        '500':
-          description: Server error
-          content:
-            application/json:
-              example:
-                message: Registration error
-                code: AUTH_REGISTER_ERROR
-  /auth/login:
-    post:
-      summary: Login by email and password
-      description: Returns JWT token and user profile upon successful authentication.
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                email:
-                  type: string
-                  format: email
-                password:
-                  type: string
-              required: [email, password]
-            example:
-              email: john.doe@example.com
-              password: secret123
-      responses:
-        '200':
-          description: Authenticated
-          content:
-            application/json:
-              example:
-                user:
-                  _id: 66f0c0a0a0a0a0a0a0a0a0a0
-                  email: john.doe@example.com
-                  role: courier
-                  fullName: John Doe
-                  phone: "+1-555-1234"
-                  isActive: true
-                  createdAt: 2024-01-01T00:00:00.000Z
-                  updatedAt: 2024-01-01T00:00:00.000Z
-                token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
-        '400':
-          description: Validation error
-          content:
-            application/json:
-              example:
-                message: Email and password are required
-                code: VALIDATION_ERROR
-        '401':
-          description: Invalid credentials
-          content:
-            application/json:
-              example:
-                message: Invalid email or password
-                code: INVALID_CREDENTIALS
-        '500':
-          description: Server error
-          content:
-            application/json:
-              example:
-                message: Login error
-                code: AUTH_LOGIN_ERROR
-  /auth/me:
-    get:
-      summary: Get current user profile
-      security:
-        - bearerAuth: []
-      description: Returns the current authenticated user (and courier profile if role is courier).
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              example:
-                user:
-                  _id: 66f0c0a0a0a0a0a0a0a0a0a0
-                  email: john.doe@example.com
-                  role: courier
-                  fullName: John Doe
-                  phone: "+1-555-1234"
-                  isActive: true
-                  createdAt: 2024-01-01T00:00:00.000Z
-                  updatedAt: 2024-01-01T00:00:00.000Z
-                courier:
-                  _id: 66f0c0b1b1b1b1b1b1b1b1b1
-                  user: 66f0c0a0a0a0a0a0a0a0a0a0
-                  vehicleType: bike
-                  city: New York
-                  rating: 0
-                  isAvailable: true
-                  currentLocation:
-                    lat: null
-                    lng: null
-                  createdAt: 2024-01-01T00:00:00.000Z
-                  updatedAt: 2024-01-01T00:00:00.000Z
-        '401':
-          description: Unauthorized
-          content:
-            application/json:
-              example:
-                message: Authorization header is missing or invalid
-                code: AUTH_HEADER_MISSING
-        '404':
-          description: User not found
-          content:
-            application/json:
-              example:
-                message: User not found
-                code: USER_NOT_FOUND
-        '500':
-          description: Server error
-          content:
-            application/json:
-              example:
-                message: Profile error
-                code: AUTH_ME_ERROR
-  /couriers:
-    get:
-      summary: Couriers namespace handshake
-      description: Placeholder route to verify couriers namespace is reachable.
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              example:
-                scope: couriers
-                message: Couriers API is reachable
-  /orders:
-    get:
-      summary: Orders namespace handshake
-      description: Placeholder route to verify orders namespace is reachable.
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              example:
-                scope: orders
-                message: Orders API is reachable
-  /users:
-    get:
-      summary: Users namespace handshake
-      description: Placeholder route to verify users namespace is reachable.
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              example:
-                scope: users
-                message: Users API is reachable
+    description: Base API path
 components:
   securitySchemes:
     bearerAuth:
@@ -293,50 +13,367 @@ components:
       scheme: bearer
       bearerFormat: JWT
   schemas:
-    User:
+    UserShort:
       type: object
       properties:
         _id:
           type: string
-        email:
-          type: string
-        role:
-          type: string
-          enum: [admin, dispatcher, courier]
+          example: "665fd9b2a1b2c3d4e5f60789"
         fullName:
           type: string
+          example: "John Doe"
         phone:
           type: string
+          example: "+1234567890"
+        role:
+          type: string
+          enum: [admin, dispatcher, courier, customer]
+          example: courier
         isActive:
           type: boolean
-        createdAt:
-          type: string
-        updatedAt:
-          type: string
+          example: true
     Courier:
       type: object
       properties:
         _id:
           type: string
         user:
-          type: string
-        vehicleType:
-          type: string
-          enum: [foot, bike, car, scooter]
+          $ref: '#/components/schemas/UserShort'
         city:
           type: string
-        rating:
-          type: number
+          example: "New York"
         isAvailable:
           type: boolean
-        currentLocation:
-          type: object
-          properties:
-            lat:
-              type: number
-            lng:
-              type: number
+          example: true
+        rating:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 5
+          example: 4.7
+        vehicleType:
+          type: string
+          enum: [car, bike, foot, scooter, other]
+          example: bike
+        notes:
+          type: string
+          example: "Can deliver fragile items"
         createdAt:
           type: string
+          format: date-time
         updatedAt:
           type: string
+          format: date-time
+    CourierListResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Courier'
+        total:
+          type: integer
+          example: 42
+        page:
+          type: integer
+          example: 1
+        limit:
+          type: integer
+          example: 20
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+        details:
+          type: string
+paths:
+  /couriers:
+    get:
+      summary: List couriers with filters and pagination
+      description: Returns a paginated list of couriers with optional filters and sorting.
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: q
+          schema:
+            type: string
+          description: Search by user fullName or phone (case-insensitive).
+        - in: query
+          name: city
+          schema:
+            type: string
+          description: Filter by courier city (exact match).
+        - in: query
+          name: isAvailable
+          schema:
+            type: boolean
+          description: Filter by availability.
+        - in: query
+          name: ratingFrom
+          schema:
+            type: number
+          description: Minimal rating (inclusive).
+        - in: query
+          name: ratingTo
+          schema:
+            type: number
+          description: Maximal rating (inclusive).
+        - in: query
+          name: page
+          schema:
+            type: integer
+            default: 1
+          description: Page number (1-based).
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 20
+          description: Page size (1..100).
+        - in: query
+          name: sortBy
+          schema:
+            type: string
+            enum: [createdAt, rating, fullName, city, isAvailable]
+            default: createdAt
+          description: Sort field.
+        - in: query
+          name: sortDir
+          schema:
+            type: string
+            enum: [asc, desc]
+            default: desc
+          description: Sort direction.
+      responses:
+        '200':
+          description: List of couriers
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CourierListResponse'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    post:
+      summary: Create a new courier
+      description: Create a courier profile. If userId is not provided, a new user with role=courier will be created. Requires roles admin|dispatcher.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                userId:
+                  type: string
+                  description: Existing user id to attach as courier.
+                fullName:
+                  type: string
+                  description: Required if userId not provided.
+                phone:
+                  type: string
+                  description: Required if userId not provided; must be unique across users.
+                email:
+                  type: string
+                city:
+                  type: string
+                isAvailable:
+                  type: boolean
+                rating:
+                  type: number
+                vehicleType:
+                  type: string
+                  enum: [car, bike, foot, scooter, other]
+                notes:
+                  type: string
+      responses:
+        '201':
+          description: Created courier
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Courier'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Conflict (duplicate phone or courier exists)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /couriers/{id}:
+    get:
+      summary: Get courier by id
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Courier details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Courier'
+        '400':
+          description: Invalid id
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    put:
+      summary: Update courier
+      description: Update courier profile and (optionally) related user fields (fullName, phone, email). Requires roles admin|dispatcher.
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                city:
+                  type: string
+                isAvailable:
+                  type: boolean
+                rating:
+                  type: number
+                vehicleType:
+                  type: string
+                  enum: [car, bike, foot, scooter, other]
+                notes:
+                  type: string
+                user:
+                  type: object
+                  properties:
+                    fullName:
+                      type: string
+                    phone:
+                      type: string
+                    email:
+                      type: string
+      responses:
+        '200':
+          description: Updated courier
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Courier'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Conflict (e.g., phone already used)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    delete:
+      summary: Remove courier
+      description: Soft delete by default (sets user.isActive=false and courier.isAvailable=false). If query hard=true, hard deletes courier document and deactivates user.
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+        - in: query
+          name: hard
+          required: false
+          schema:
+            type: boolean
+          description: If true, performs a hard delete of the courier document.
+      responses:
+        '200':
+          description: Delete result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                  deleted:
+                    type: boolean
+                  mode:
+                    type: string
+                    enum: [soft, hard]
+                  userDeactivated:
+                    type: boolean
+        '400':
+          description: Invalid id
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+security:
+  - bearerAuth: []
