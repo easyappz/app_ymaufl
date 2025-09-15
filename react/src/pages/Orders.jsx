@@ -1,8 +1,11 @@
-import React, { useMemo, useState } from 'react';
-import { Table, Tag, Input, Select, Space, DatePicker } from 'antd';
-import dayjs from 'dayjs';
-import { useQuery } from '@tanstack/react-query';
-import { getOrders } from '../api/orders';
+import React, { useEffect, useMemo, useState } from 'react';
+import { Table, Tag, Input, Select, Space, DatePicker, Button, message } from 'antd';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { assignOrder, changeOrderStatus, createOrder, getOrders, updateOrder } from '../api/orders';
+import { getCouriers } from '../api/couriers';
+import OrderFormModal from '../components/orders/OrderFormModal';
+import AssignCourierModal from '../components/orders/AssignCourierModal';
+import StatusModal from '../components/orders/StatusModal';
 
 const { RangePicker } = DatePicker;
 
@@ -15,11 +18,40 @@ const statusColors = {
 };
 
 export default function Orders() {
+  const queryClient = useQueryClient();
   const [q, setQ] = useState('');
   const [status, setStatus] = useState();
   const [range, setRange] = useState([null, null]);
+  const [courierId, setCourierId] = useState();
+  const [courierSearch, setCourierSearch] = useState('');
+  const [courierOptions, setCourierOptions] = useState([]);
+
   const [pagination, setPagination] = useState({ current: 1, pageSize: 10 });
   const [sorter, setSorter] = useState({ field: 'createdAt', order: 'descend' });
+
+  const [createOpen, setCreateOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
+  const [editingOrder, setEditingOrder] = useState(null);
+  const [assignOpen, setAssignOpen] = useState(false);
+  const [statusOpen, setStatusOpen] = useState(false);
+
+  useEffect(() => {
+    let ignore = false;
+    async function fetchCouriers() {
+      try {
+        const data = await getCouriers({ q: courierSearch, page: 1, limit: 10 });
+        if (ignore) return;
+        setCourierOptions((data?.items || []).map((c) => ({
+          label: c?.user?.fullName ? `${c.user.fullName}${c.user.phone ? ` (${c.user.phone})` : ''}` : (c?.user?.phone || c?._id),
+          value: c._id,
+        })));
+      } catch (e) {
+        // handled globally
+      }
+    }
+    fetchCouriers();
+    return () => { ignore = true; };
+  }, [courierSearch]);
 
   const params = useMemo(() => {
     const p = { page: pagination.current, limit: pagination.pageSize };
@@ -27,6 +59,7 @@ export default function Orders() {
     if (status) p.status = status;
     if (range[0]) p.createdFrom = range[0].toISOString();
     if (range[1]) p.createdTo = range[1].toISOString();
+    if (courierId) p.courierId = courierId;
     if (sorter && sorter.field) {
       const map = { createdAt: 'createdAt', price: 'price', status: 'status', number: 'number', customerName: 'customerName' };
       const sortBy = map[sorter.field] || 'createdAt';
@@ -35,12 +68,53 @@ export default function Orders() {
       p.sortDir = sortDir;
     }
     return p;
-  }, [q, status, range, pagination, sorter]);
+  }, [q, status, range, courierId, pagination, sorter]);
 
   const { data, isLoading } = useQuery({
     queryKey: ['orders', 'list', params],
     queryFn: () => getOrders(params),
     keepPreviousData: true,
+  });
+
+  const createMutation = useMutation({
+    mutationFn: createOrder,
+    onSuccess: async () => {
+      message.success('Заказ создан');
+      setCreateOpen(false);
+      await queryClient.invalidateQueries({ queryKey: ['orders'] });
+    },
+    onError: () => message.error('Не удалось создать заказ'),
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: ({ id, values }) => updateOrder(id, values),
+    onSuccess: async () => {
+      message.success('Заказ обновлён');
+      setEditOpen(false);
+      setEditingOrder(null);
+      await queryClient.invalidateQueries({ queryKey: ['orders'] });
+    },
+    onError: () => message.error('Не удалось обновить заказ'),
+  });
+
+  const assignMutation = useMutation({
+    mutationFn: ({ id, courierId: cId }) => assignOrder(id, { courierId: cId }),
+    onSuccess: async () => {
+      message.success('Назначение обновлено');
+      setAssignOpen(false);
+      await queryClient.invalidateQueries({ queryKey: ['orders'] });
+    },
+    onError: () => message.error('Не удалось изменить назначение'),
+  });
+
+  const statusMutation = useMutation({
+    mutationFn: ({ id, status: st }) => changeOrderStatus(id, { status: st }),
+    onSuccess: async () => {
+      message.success('Статус изменён');
+      setStatusOpen(false);
+      await queryClient.invalidateQueries({ queryKey: ['orders'] });
+    },
+    onError: () => message.error('Не удалось изменить статус'),
   });
 
   const columns = [
@@ -58,6 +132,17 @@ export default function Orders() {
       render: (val) => <Tag color={statusColors[val] || 'default'}>{val}</Tag>,
     },
     { title: 'Курьер', dataIndex: ['courier', 'user', 'fullName'], key: 'courierName' },
+    {
+      title: 'Действия',
+      key: 'actions',
+      render: (_, record) => (
+        <Space>
+          <Button onClick={() => { setEditingOrder(record); setEditOpen(true); }}>Редактировать</Button>
+          <Button onClick={() => { setEditingOrder(record); setAssignOpen(true); }}>Назначить</Button>
+          <Button onClick={() => { setEditingOrder(record); setStatusOpen(true); }}>Статус</Button>
+        </Space>
+      ),
+    },
   ];
 
   const onChange = (paginationArg, filters, sorterArg) => {
@@ -83,7 +168,19 @@ export default function Orders() {
           ]}
           onChange={setStatus}
         />
+        <Select
+          placeholder="Курьер"
+          value={courierId}
+          allowClear
+          showSearch
+          filterOption={false}
+          onSearch={setCourierSearch}
+          onChange={setCourierId}
+          options={courierOptions}
+          style={{ width: 280 }}
+        />
         <RangePicker value={range} onChange={(vals) => setRange(vals || [null, null])} />
+        <Button type="primary" onClick={() => setCreateOpen(true)}>Создать заказ</Button>
       </Space>
       <Table
         rowKey="_id"
@@ -92,6 +189,48 @@ export default function Orders() {
         dataSource={data?.items || []}
         pagination={{ current: data?.page || pagination.current, pageSize: data?.limit || pagination.pageSize, total: data?.total || 0, showSizeChanger: true }}
         onChange={onChange}
+      />
+
+      <OrderFormModal
+        open={createOpen}
+        title="Новый заказ"
+        loading={createMutation.isLoading}
+        onCancel={() => setCreateOpen(false)}
+        onSubmit={(values) => createMutation.mutate(values)}
+      />
+
+      <OrderFormModal
+        open={editOpen}
+        title="Редактировать заказ"
+        initialValues={editingOrder}
+        loading={updateMutation.isLoading}
+        onCancel={() => { setEditOpen(false); setEditingOrder(null); }}
+        onSubmit={(values) => {
+          const payload = {
+            number: values.number,
+            customerName: values.customerName,
+            customerPhone: values.customerPhone,
+            addressFrom: values.addressFrom,
+            addressTo: values.addressTo,
+            price: values.price,
+            notes: values.notes,
+          };
+          updateMutation.mutate({ id: editingOrder._id, values: payload });
+        }}
+      />
+
+      <AssignCourierModal
+        open={assignOpen}
+        initialCourierId={editingOrder?.courier?._id}
+        onCancel={() => { setAssignOpen(false); setEditingOrder(null); }}
+        onSubmit={(cId) => assignMutation.mutate({ id: editingOrder._id, courierId: cId })}
+      />
+
+      <StatusModal
+        open={statusOpen}
+        currentStatus={editingOrder?.status}
+        onCancel={() => { setStatusOpen(false); setEditingOrder(null); }}
+        onSubmit={(st) => statusMutation.mutate({ id: editingOrder._id, status: st })}
       />
     </Space>
   );
