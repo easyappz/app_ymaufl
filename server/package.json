@@ -1,16 +1,18 @@
 {
-  "name": "simple-express-app",
+  "name": "courier-management-backend",
   "version": "1.0.0",
-  "description": "A simple Node.js Express application",
-  "main": "index.js",
+  "description": "Courier Management API (Express + Mongoose)",
+  "main": "src/server.js",
   "scripts": {
-    "start": "node index.js",
-    "dev": "nodemon index.js"
+    "start": "node src/server.js",
+    "dev": "nodemon src/server.js"
   },
   "keywords": [
     "express",
     "node",
-    "api"
+    "api",
+    "mongoose",
+    "courier"
   ],
   "author": "",
   "license": "ISC",

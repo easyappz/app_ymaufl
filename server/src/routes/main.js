@@ -1,34 +1,33 @@
-const express = require('express');
-const mongoose = require('mongoose');
+const express = require("express");
 
-/**
- * Пример создания модели в базу данных
- */
-// const MongoTestSchema = new mongoose.Schema({
-//   value: { type: String, required: true },
-// });
-
-// const MongoModelTest = mongoose.model('Test', MongoTestSchema);
-
-// const newTest = new MongoModelTest({
-//   value: 'test-value',
-// });
-
-// newTest.save();
+const authController = require("@src/controllers/authController");
+const courierController = require("@src/controllers/courierController");
+const orderController = require("@src/controllers/orderController");
+const userController = require("@src/controllers/userController");
+const statusController = require("@src/controllers/statusController");
 
 const router = express.Router();
 
-// GET /api/hello
-router.get('/hello', (req, res) => {
-  res.json({ message: 'Hello from API!' });
-});
+// Namespaced routers
+const authRouter = express.Router();
+authRouter.get("/", authController.handshake);
 
-// GET /api/status
-router.get('/status', (req, res) => {
-  res.json({ 
-    status: 'ok',
-    timestamp: new Date().toISOString()
-  });
-});
+const couriersRouter = express.Router();
+couriersRouter.get("/", courierController.handshake);
+
+const ordersRouter = express.Router();
+ordersRouter.get("/", orderController.handshake);
+
+const usersRouter = express.Router();
+usersRouter.get("/", userController.handshake);
+
+// Service status
+router.get("/status", statusController.status);
+
+// Mount namespaces
+router.use("/auth", authRouter);
+router.use("/couriers", couriersRouter);
+router.use("/orders", ordersRouter);
+router.use("/users", usersRouter);
 
 module.exports = router;

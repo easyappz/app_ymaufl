@@ -1,0 +1,77 @@
+openapi: 3.0.3
+info:
+  title: Courier Management API
+  version: 0.1.0
+  description: |
+    HTTP-only (no sockets) API for a courier management system.
+    All endpoints are prefixed with /api on the server.
+servers:
+  - url: /api
+paths:
+  /status:
+    get:
+      summary: Service status
+      description: Returns basic service health information.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              example:
+                status: ok
+                timestamp: 2024-01-01T00:00:00.000Z
+                service: Courier Management API
+  /auth:
+    get:
+      summary: Auth namespace handshake
+      description: Placeholder route to verify auth namespace is reachable.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              example:
+                scope: auth
+                message: Auth API is reachable
+  /couriers:
+    get:
+      summary: Couriers namespace handshake
+      description: Placeholder route to verify couriers namespace is reachable.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              example:
+                scope: couriers
+                message: Couriers API is reachable
+  /orders:
+    get:
+      summary: Orders namespace handshake
+      description: Placeholder route to verify orders namespace is reachable.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              example:
+                scope: orders
+                message: Orders API is reachable
+  /users:
+    get:
+      summary: Users namespace handshake
+      description: Placeholder route to verify users namespace is reachable.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              example:
+                scope: users
+                message: Users API is reachable
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
